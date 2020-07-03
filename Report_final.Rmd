@@ -9,7 +9,36 @@ output:
     code_folding: hide
     code_download: true
     theme: default
+params:
+  year1:
+    label: "First (earlier) year for arrow chart comparison?"
+    value: 1975
+    min: 1950
+    max: 2018
+    step: 1
+  year2:
+    label: "Second (later) year for arrow chart comparison?"
+    value: 2015
+    min: 1950
+    max: 2018
+    step: 1
+  state:
+    label: "Pick a Federal State for line chart"
+    value: "Niedersachsen"
+    input: select
+    choices: !r levels(laenderfinanz$Bundesland)
 ---
+
+```{r param_year_plausib}
+
+# Test, ob year1 vor year2 liegt:
+
+if (params$year2 <= params$year1) {
+  stop("Second year must be later than first year!\nPlease knit again with different choices for years.")
+}
+
+```
+
 
 ```{r setup, include=FALSE}
 
@@ -56,5 +85,51 @@ ggplot(df, aes(x = `1995`, xend = `2018`,
   theme(text = element_text(size = 12))
 
 
+```
+
+## One Federal State: Select via Parameter
+
+You chose to select `r params$state`.
+
+```{r state}
+
+chart <- laenderfinanz %>% 
+  filter(Bundesland == params$state) %>% 
+  ggplot(aes(x = Jahr, y = Finanzausgleich)) +
+  geom_line(col = "blue") +
+  theme_bw() +
+  labs(title = glue("Financial compensation: {params$state}"),
+       x = "Year", y = "Compensation", caption = "Data: https://de.wikipedia.org/wiki/Länderfinanzausgleich#Finanzvolumen")
+
+ggplotly(chart)
+
+```
+
+
+## Tidy Eval: Arrow Chart, `r params$year2` vs. `r params$year1`
+
+Greift auf Parameter zurück ...
+
+```{r arrows_params}
+
+year1c <- as.name(params$year1)
+year2c <- as.name(params$year2)
+
+df <- laenderfinanz %>%
+  select(-Typ) %>%
+  pivot_wider(names_from = Jahr, values_from = Finanzausgleich) %>% 
+  select(Bundesland, {{year1c}}, {{year2c}}) %>% 
+  na.omit()
+
+ggplot(df, aes(x = {{year1c}}, xend = {{year2c}},
+               y = reorder(Bundesland, {{year2c}}),
+               yend = reorder(Bundesland, {{year2c}}))) +
+  geom_segment(size = 1.5, arrow = arrow(length = unit(0.3, "cm"))) +
+  labs(x = "Financial Compensation, unit = 1 Million Euro",
+       y = NULL,
+       title = glue("Financial Compensation between Federal States\n{params$year1} vs. {params$year2}"),
+       caption = "Data: https://de.wikipedia.org/wiki/Länderfinanzausgleich#Finanzvolumen") +
+  theme_bw() +
+  theme(text = element_text(size = 12))
 ```
 
